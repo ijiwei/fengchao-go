@@ -41,6 +41,9 @@ func (m *PromptTemplate) Render(vairables map[string]interface{}) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
+	if !m.HumanFriendly {
+		return json.Marshal(messages)
+	}
 	return json.MarshalIndent(messages, "", "  ")
 }
 
