@@ -38,11 +38,25 @@ func (m *Message) execute(vairables map[string]interface{}) error {
 }
 
 func (m *Message) Render(vairables map[string]interface{}) ([]byte, error) {
+	if m.template == nil {
+		return json.Marshal(m)
+	}
 	err := m.execute(vairables)
 	if err != nil {
 		return nil, err
 	}
 	return json.Marshal(m)
+}
+
+func (m *Message) RenderMessages(vairables map[string]interface{}) ([]Message, error) {
+	if m.template == nil {
+		return []Message{*m}, nil
+	}
+	err := m.execute(vairables)
+	if err != nil {
+		return nil, err
+	}
+	return []Message{*m}, nil
 }
 
 type lazyMessage func() (*Message, error)
@@ -56,6 +70,14 @@ func (message lazyMessage) Render(vairables map[string]interface{}) ([]byte, err
 	}
 
 	return msg.Render(vairables)
+}
+
+func (message lazyMessage) RenderMessages(vairables map[string]interface{}) ([]Message, error) {
+	msg, err := message()
+	if err != nil {
+		return nil, err
+	}
+	return msg.RenderMessages(vairables)
 }
 
 func NewMessage(role string, messageStr string) lazyMessage {

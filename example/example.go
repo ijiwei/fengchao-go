@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	fengchaogo "github.com/ijiwei/fengchao-go"
+	fengchao "github.com/ijiwei/fengchao-go"
 )
 
 const systemPrompt = `
@@ -27,7 +27,7 @@ const ContentGeneratorPrompt = `
 
 func example() {
 	// 渲染系统消息
-	systemMessage := fengchaogo.NewMessage(fengchaogo.RoleSystem, systemPrompt)
+	systemMessage := fengchao.NewMessage(fengchao.RoleSystem, systemPrompt)
 	sm, err := systemMessage.Render(nil)
 	if err != nil {
 		panic(err)
@@ -40,17 +40,17 @@ func example() {
 	fmt.Printf("%s\n", string(sm))
 
 	// 渲染 Prompt
-	promptOne := fengchaogo.NewPromptTemplate(
+	promptOne := fengchao.NewPromptTemplate(
 		systemMessage,
 		// 如果直接使用Message, 无法渲染，所以如果有变量的话，更推荐直接使用NewMessage
 		// 当然你不想用提供的模板变量，也可以自己生成message的content
-		&fengchaogo.Message{
-			Role: fengchaogo.RoleUser,
+		&fengchao.Message{
+			Role: fengchao.RoleUser,
 			Content: `1+1=2
 			对吗？`,
 		},
-		fengchaogo.NewMessage(fengchaogo.RoleAssistant, "对的"),
-		fengchaogo.NewMessage(fengchaogo.RoleUser, "你的名字是{{.name}}吗?"),
+		fengchao.NewMessage(fengchao.RoleAssistant, "对的"),
+		fengchao.NewMessage(fengchao.RoleUser, "你的名字是{{.name}}吗?"),
 	)
 	promptOne.HumanFriendly = true
 	m, err := promptOne.Render(map[string]interface{}{"name": "fengchao"})
@@ -65,10 +65,10 @@ func example() {
 	fmt.Println(string(m))
 
 	// 使用NewMessage可以使用 template 来渲染
-	prompt := fengchaogo.NewPromptTemplate(
+	prompt := fengchao.NewPromptTemplate(
 		promptOne,
-		fengchaogo.NewMessage(fengchaogo.RoleAssistant, "是的"),
-		fengchaogo.NewMessage(fengchaogo.RoleUser, ContentGeneratorPrompt),
+		fengchao.NewMessage(fengchao.RoleAssistant, "是的"),
+		fengchao.NewMessage(fengchao.RoleUser, ContentGeneratorPrompt),
 	)
 	prompt.HumanFriendly = true
 	m, err = prompt.Render(map[string]interface{}{"name": "fengchao", "title": "文章标题", "tags": "文章标签", "text": "文章内容"})
@@ -80,5 +80,27 @@ func example() {
 }
 
 func main() {
-	example()
+	// example()
+    prompt := fengchao.NewPromptTemplate(
+        fengchao.NewMessage(fengchao.RoleSystem, `你是一个非常厉害的{{.Name}}！`),
+        fengchao.NewMessage(fengchao.RoleUser, `分别讲一个关于{{range .Items}}、{{.}}{{end}}的笑话吧`),
+		fengchao.NewMessage(fengchao.RoleAssistant, `小猫：小猫去银行，工作人员问：“你要存什么？”小猫眨眨眼说：“我存爪印！”
+小狗：小狗学会了打字，但每次发的都是“汪汪汪”，它说：“我这不是在聊天，是在打码！”
+小狐狸：小狐狸问妈妈：“为什么我们叫狡猾？”妈妈笑着说：“因为我们知道怎么用优惠券！”`),
+    )
+	prompt = fengchao.NewPromptTemplate(
+		prompt,
+        fengchao.NewMessage(fengchao.RoleUser, `再讲{{.Count}}个好不好？`),
+	)
+	prompt.HumanFriendly = true
+    PromptJson, err := prompt.Render(map[string]interface{}{
+        "Items": []string{"小猫", "小狗", "小狐狸"},
+        "Name": "智能助手",
+		"Count": 3,
+    })
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(string(PromptJson)) 
+
 }
