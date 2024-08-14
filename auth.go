@@ -9,8 +9,8 @@ import (
 const ExpiresTime = 1700
 
 type AuthToken struct {
-	AccessToken string `json:"access_token"`
-	ExpiresIn   int64  `json:"expires_in"`
+	accessToken string
+	expiresIn   int64
 }
 
 type AuthResult struct {
@@ -21,21 +21,23 @@ type AuthResult struct {
 
 // getAuthToken 获取token
 func (f *FengChao) getAuthToken(ctx context.Context) (string, error) {
-	if f.authToken != nil && f.authToken.ExpiresIn > time.Now().Unix() {
-		return f.authToken.AccessToken, nil
+	if f.authToken == nil || f.authToken.expiresIn < time.Now().Unix() {
+		err := f.refreshToken(ctx)
+		if err != nil {
+			return "", err
+		}
 	}
 
-	err := f.refreshToken(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	return f.authToken.AccessToken, nil
+	return f.authToken.accessToken, nil
 }
 
 // refreshToken 刷新token
 func (f *FengChao) refreshToken(ctx context.Context) error {
+	// 设置超时
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(5)*time.Second)
+	defer cancel()
 	resp, err := f.client.R().
+		SetContext(ctx).
 		SetQueryParam("api_key", f.ApiKey).
 		SetQueryParam("secret_key", f.SecretKey).
 		SetResult(&AuthResult{}).
@@ -49,13 +51,13 @@ func (f *FengChao) refreshToken(ctx context.Context) error {
 		return fmt.Errorf("get auth token response error: %v", resp)
 	}
 
-	if resp.Result().(*AuthResult).Status != 0 {
+	if resp.Result().(*AuthResult).Status != 200 {
 		return fmt.Errorf("get auth token error: %v", resp.Result().(*AuthResult).Msg)
 	}
 
 	f.authToken = &AuthToken{
-		AccessToken: resp.Result().(*AuthResult).Token,
-		ExpiresIn:   time.Now().Unix() + int64(ExpiresTime),
+		accessToken: resp.Result().(*AuthResult).Token,
+		expiresIn:   time.Now().Unix() + int64(ExpiresTime),
 	}
 
 	return nil

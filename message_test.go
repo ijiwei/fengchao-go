@@ -13,7 +13,7 @@ func TestMessage_execute(t *testing.T) {
 		Role     string
 		Content  string
 		Template *template.Template
-		buffer   bytes.Buffer
+		buffer   *bytes.Buffer
 	}
 	type args struct {
 		vairables map[string]interface{}
@@ -30,7 +30,7 @@ func TestMessage_execute(t *testing.T) {
 				Role:     "user",
 				Content:  "hello",
 				Template: template.Must(template.New("").Parse("hello {{.Name}}")),
-				buffer:   bytes.Buffer{},
+				buffer:   &bytes.Buffer{},
 			},
 			args: args{
 				vairables: map[string]interface{}{
@@ -45,7 +45,7 @@ func TestMessage_execute(t *testing.T) {
 				Role:     "user",
 				Content:  "hello",
 				Template: template.Must(template.New("").Parse("hello wwwww")),
-				buffer:   bytes.Buffer{},
+				buffer:   &bytes.Buffer{},
 			},
 			args: args{
 				vairables: map[string]interface{}{
@@ -93,7 +93,7 @@ func TestNewMessage(t *testing.T) {
 				Role:     "user",
 				Content:  "",
 				template: template.Must(template.New("").Parse("hello {{.Name}}")),
-				buffer:   bytes.Buffer{},
+				buffer:   nil,
 			},
 			false,
 		},

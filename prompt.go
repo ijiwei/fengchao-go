@@ -10,12 +10,12 @@ type Prompt interface {
 	// Render 渲染，这个用来展示
 	Render(vairables map[string]interface{}) ([]byte, error)
 	// RenderMessages 渲染消息列表，对应的渲染方法是 Render，这个提供给用户自定义使用
-	RenderMessages(vairables map[string]interface{}) ([]Message, error)
+	RenderMessages(vairables map[string]interface{}) ([]*Message, error)
 }
 
 // PromptTemplate 模板
 type PromptTemplate struct {
-	Messages []Message
+	Messages []*Message
 	Prompts  []Prompt
 
 	HumanFriendly bool
@@ -48,7 +48,7 @@ func (m *PromptTemplate) Render(vairables map[string]interface{}) ([]byte, error
 }
 
 // RenderMessages 渲染消息列表
-func (m *PromptTemplate) RenderMessages(vairables map[string]interface{}) ([]Message, error) {
+func (m *PromptTemplate) RenderMessages(vairables map[string]interface{}) ([]*Message, error) {
 	defer func() {
 		m.Messages = nil
 	}()
@@ -72,10 +72,10 @@ func (m *PromptTemplate) execute(vairables map[string]interface{}) error {
 			if err := promptTemplate.execute(vairables); err != nil {
 				return err
 			}
-			m.Messages = promptTemplate.Messages
+			m.Messages = append(m.Messages, promptTemplate.Messages...)
 		case *Message:
 			message := item
-			m.Messages = append(m.Messages, *message)
+			m.Messages = append(m.Messages, message)
 		case lazyMessage:
 			message, err := item()
 			if err != nil {
@@ -85,7 +85,7 @@ func (m *PromptTemplate) execute(vairables map[string]interface{}) error {
 			if err != nil {
 				return fmt.Errorf("execute lazy message error cause %v", err)
 			}
-			m.Messages = append(m.Messages, *message)
+			m.Messages = append(m.Messages, message)
 		default:
 			continue
 		}

@@ -22,6 +22,9 @@ type FengChao struct {
 
 	// Logger 日志
 	logger *logrus.Logger
+
+	// AvailableModels 可用模型
+	AvailableModels *ModelsManager
 }
 
 func NewFengChao(apiKey string, secretKey string, baseUrl string) *FengChao {
@@ -33,10 +36,15 @@ func NewFengChao(apiKey string, secretKey string, baseUrl string) *FengChao {
 
 	client := resty.New().
 		SetBaseURL(fengChao.BaseUrl).
-		SetLogger(nil)
+		SetDebug(false)
 	fengChao.client = client
 	fengChao.logger = logrus.StandardLogger()
 	return fengChao
+}
+
+func (f *FengChao) SetDebug(debug bool) *FengChao {
+	f.client.SetDebug(debug)
+	return f
 }
 
 func (f *FengChao) SetLogger(logger *logrus.Logger) *FengChao {
