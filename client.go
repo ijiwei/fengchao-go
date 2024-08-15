@@ -1,9 +1,12 @@
 package fengchaogo
 
 import (
+	"sync"
+
 	"github.com/go-resty/resty/v2"
-	"github.com/sirupsen/logrus"
 )
+
+const BasicRequestTimeout int = 3
 
 // FengChaoOptions 配置
 type FengChao struct {
@@ -18,10 +21,12 @@ type FengChao struct {
 	client *resty.Client
 
 	// authToken 认证令牌
-	authToken *AuthToken
+	auth *authManager
 
-	// Logger 日志
-	logger *logrus.Logger
+	// availableModels 可用模型
+	availableModels *modelsManager
+
+	sync.Mutex
 }
 
 func NewFengChao(apiKey string, secretKey string, baseUrl string) *FengChao {
@@ -33,13 +38,12 @@ func NewFengChao(apiKey string, secretKey string, baseUrl string) *FengChao {
 
 	client := resty.New().
 		SetBaseURL(fengChao.BaseUrl).
-		SetLogger(nil)
+		SetDebug(false)
 	fengChao.client = client
-	fengChao.logger = logrus.StandardLogger()
 	return fengChao
 }
 
-func (f *FengChao) SetLogger(logger *logrus.Logger) *FengChao {
-	f.logger = logger
+func (f *FengChao) SetDebug(debug bool) *FengChao {
+	f.client.SetDebug(debug)
 	return f
 }

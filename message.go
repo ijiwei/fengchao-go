@@ -18,19 +18,28 @@ type Message struct {
 	Content string `json:"content"`
 
 	template *template.Template
-	buffer   bytes.Buffer
+	buffer   *bytes.Buffer
 }
 
-func (m *Message) execute(vairables map[string]interface{}) error {
+var _ Prompt = (*Message)(nil)
 
-	if err := m.template.Execute(&m.buffer, vairables); err != nil {
+func (m *Message) execute(vairables map[string]interface{}) error {
+	if m.template == nil {
+		return fmt.Errorf("message template is empty, can not execute")
+	}
+	if m.buffer == nil {
+		m.buffer = &bytes.Buffer{}
+	}
+	if err := m.template.Execute(m.buffer, vairables); err != nil {
 		return err
 	}
 	m.Content = m.buffer.String()
+	m.buffer.Reset()
+	
+	return nil
+}
 
-	if m.Content == "" {
-		return fmt.Errorf("message content is empty")
-	}
+func (m *Message) checkRole() error {
 	if m.Role != RoleUser && m.Role != RoleAssistant && m.Role != RoleSystem {
 		return fmt.Errorf("message role is invalid")
 	}
@@ -38,25 +47,32 @@ func (m *Message) execute(vairables map[string]interface{}) error {
 }
 
 func (m *Message) Render(vairables map[string]interface{}) ([]byte, error) {
-	if m.template == nil {
-		return json.Marshal(m)
-	}
-	err := m.execute(vairables)
-	if err != nil {
+	if err := m.checkRole(); err != nil {
 		return nil, err
 	}
+	if m.template != nil {
+		err := m.execute(vairables)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return json.Marshal(m)
 }
 
-func (m *Message) RenderMessages(vairables map[string]interface{}) ([]Message, error) {
-	if m.template == nil {
-		return []Message{*m}, nil
-	}
-	err := m.execute(vairables)
-	if err != nil {
+func (m *Message) RenderMessages(vairables map[string]interface{}) ([]*Message, error) {
+	if err := m.checkRole(); err != nil {
 		return nil, err
 	}
-	return []Message{*m}, nil
+
+	if m.template != nil {
+		err := m.execute(vairables)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return []*Message{m}, nil
 }
 
 type lazyMessage func() (*Message, error)
@@ -72,7 +88,7 @@ func (message lazyMessage) Render(vairables map[string]interface{}) ([]byte, err
 	return msg.Render(vairables)
 }
 
-func (message lazyMessage) RenderMessages(vairables map[string]interface{}) ([]Message, error) {
+func (message lazyMessage) RenderMessages(vairables map[string]interface{}) ([]*Message, error) {
 	msg, err := message()
 	if err != nil {
 		return nil, err
@@ -81,9 +97,7 @@ func (message lazyMessage) RenderMessages(vairables map[string]interface{}) ([]M
 }
 
 func NewMessage(role string, messageStr string) lazyMessage {
-	if role != RoleUser && role != RoleAssistant && role != RoleSystem {
-		role = RoleUser
-	}
+	
 	return func() (*Message, error) {
 		template, err := template.New("").Parse(messageStr)
 		if err != nil {
