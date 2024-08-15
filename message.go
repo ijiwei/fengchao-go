@@ -35,7 +35,7 @@ func (m *Message) execute(vairables map[string]interface{}) error {
 	}
 	m.Content = m.buffer.String()
 	m.buffer.Reset()
-	m.buffer = nil
+	
 	return nil
 }
 
@@ -97,9 +97,7 @@ func (message lazyMessage) RenderMessages(vairables map[string]interface{}) ([]*
 }
 
 func NewMessage(role string, messageStr string) lazyMessage {
-	if role != RoleUser && role != RoleAssistant && role != RoleSystem {
-		role = RoleUser
-	}
+	
 	return func() (*Message, error) {
 		template, err := template.New("").Parse(messageStr)
 		if err != nil {

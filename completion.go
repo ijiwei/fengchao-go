@@ -33,27 +33,32 @@ type ChatCompletion struct {
 	System string `json:"system"`
 
 	// Variables 变量
-	Variables map[string]interface{}
+	variables map[string]interface{}
 	// Stop 停用词
 	Stop []string
 	// Timeout 超时时间
 	Timeout int
 }
 
-var (
-	DefaultChatCompletionOption = &ChatCompletion{
-		Model:       "ERNIE-Bot-4",
-		Stop:        []string{},
-		MaxTokens:   2000,
-		Timeout:     60,
-		IsSensitive: false,
-		RequestID:   uuid.New().String(),
-	}
-)
+// DefaultChatCompletionOption 默认配置, 可以覆盖
+var DefaultChatCompletionOption = &ChatCompletion{
+	Model:       "ERNIE-Bot-4",
+	Stop:        []string{},
+	MaxTokens:   2000,
+	Timeout:     60,
+	IsSensitive: false,
+}
 
 // 获取默认配置
 func defaultChatCompletionOption() *ChatCompletion {
-	return DefaultChatCompletionOption
+	return DefaultChatCompletionOption.Clone()
+}
+
+// clone 拷贝
+func (cc *ChatCompletion) Clone() *ChatCompletion {
+	clone := *cc
+	clone.RequestID = uuid.New().String() // 确保生成新的 RequestID
+	return &clone
 }
 
 // WithModel 设置模型
@@ -156,7 +161,7 @@ func WithParams(variables any) Option[ChatCompletion] {
 			mapVars[t.Field(i).Name] = current.Field(i).Interface()
 		}
 		return func(option *ChatCompletion) {
-			option.Variables = mapVars
+			option.variables = mapVars
 		}
 	}
 
@@ -179,12 +184,12 @@ func WithParams(variables any) Option[ChatCompletion] {
 				mapVars[k.(string)] = v
 			}
 			return func(option *ChatCompletion) {
-				option.Variables = mapVars
+				option.variables = mapVars
 			}
 		}
 	}
 	return func(option *ChatCompletion) {
-		option.Variables = nil
+		option.variables = nil
 	}
 }
 
@@ -204,7 +209,7 @@ func (option *ChatCompletion) Apply(helpers ...Option[ChatCompletion]) {
 // RenderMessages 渲染消息列表
 func (option *ChatCompletion) LoadPromptTemplates(prompt Prompt) ([]*Message, error) {
 	var messages []*Message
-	messages, err := prompt.RenderMessages(option.Variables)
+	messages, err := prompt.RenderMessages(option.variables)
 	if err != nil {
 		return nil, fmt.Errorf("render message template with error[%v]", err)
 	}
@@ -254,7 +259,7 @@ func (f *FengChao) ChatCompletion(ctx context.Context, prompt Prompt, chatComple
 		return nil, fmt.Errorf("fail to load prompt template cause: %s", err)
 	}
 
-	AvailableModles := f.GetModels()
+	AvailableModles := f.GetAvailableModels()
 	if AvailableModles == nil {
 		return nil, fmt.Errorf("available model is empty, please check service")
 	}
@@ -278,7 +283,6 @@ func (f *FengChao) ChatCompletion(ctx context.Context, prompt Prompt, chatComple
 	if err != nil {
 		return nil, fmt.Errorf("fail to auth cause: %s", err)
 	}
-
 	// 设置超时
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(ChatCompletionOption.Timeout)*time.Second)
 	defer cancel()

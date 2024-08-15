@@ -19,32 +19,32 @@ type Model struct {
 	Created        string   `json:"created"`
 }
 
-type ModelsResponse struct {
+type modelsResponse struct {
 	Data []Model `json:"data"`
 }
 
-type ModelsManager struct {
-	model      []Model
+type modelsManager struct {
+	models     []Model
 	lastUpdate time.Time
 }
 
-func (f *FengChao) GetModels() []Model {
-	if f.AvailableModels == nil || time.Since(f.AvailableModels.lastUpdate) > 24*time.Hour {
+func (f *FengChao) GetAvailableModels() []Model {
+	if f.availableModels == nil || time.Since(f.availableModels.lastUpdate) > 24*time.Hour {
 		err := f.loadModels(context.Background())
 		if err != nil {
 			return nil
 		}
 	}
-	return f.AvailableModels.model
+	return f.availableModels.models
 }
 
 func (f *FengChao) loadModels(ctx context.Context) error {
 	// 设置超时
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(5)*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(BasicRequestTimeout)*time.Second)
 	defer cancel()
 	resp, err := f.client.R().
 		SetContext(ctx).
-		SetResult(&ModelsResponse{}).
+		SetResult(&modelsResponse{}).
 		Get("/models/")
 
 	if err != nil {
@@ -54,8 +54,8 @@ func (f *FengChao) loadModels(ctx context.Context) error {
 		return fmt.Errorf("response error")
 	}
 
-	f.AvailableModels = &ModelsManager{
-		model:      resp.Result().(*ModelsResponse).Data,
+	f.availableModels = &modelsManager{
+		models:     resp.Result().(*modelsResponse).Data,
 		lastUpdate: time.Now(),
 	}
 	return nil
