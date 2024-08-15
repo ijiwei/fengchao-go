@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	fengchao "github.com/ijiwei/fengchao-go"
-	"github.com/sirupsen/logrus"
 )
 
 const systemPrompt = `
@@ -143,7 +142,6 @@ func ChatWithHistory() {
 	apiSecret := "2fc28a69d0e8480188386031a226fa2f"
 	client := fengchao.NewFengChao(apiKey, apiSecret, "http://192.168.1.233:6051/")
 
-	client.SetLogger(logrus.StandardLogger())
 	// client.SetDebug(true)
 
 	ctx := context.Background()
@@ -211,6 +209,4 @@ func ChatWithHistory() {
 
 func main() {
 	SimpleChat()
-
-	// ChatWithHistory()
 }
