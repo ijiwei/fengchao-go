@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// Model 模型
 type Model struct {
 	ID             string   `json:"id"`
 	OwnedBy        string   `json:"owned_by"`
@@ -19,15 +20,18 @@ type Model struct {
 	Created        string   `json:"created"`
 }
 
+// modelsResponse 获取模型方法的响应
 type modelsResponse struct {
 	Data []Model `json:"data"`
 }
 
+// modelsManager 模型管理器
 type modelsManager struct {
 	models     []Model
 	lastUpdate time.Time
 }
 
+// GetAvailableModels 获取可用模型
 func (f *FengChao) GetAvailableModels() []Model {
 	if f.availableModels == nil || time.Since(f.availableModels.lastUpdate) > 24*time.Hour {
 		err := f.loadModels(context.Background())
@@ -38,12 +42,15 @@ func (f *FengChao) GetAvailableModels() []Model {
 	return f.availableModels.models
 }
 
+// loadModels 加载模型
 func (f *FengChao) loadModels(ctx context.Context) error {
 	// 设置超时
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(BasicRequestTimeout)*time.Second)
 	defer cancel()
 	resp, err := f.client.R().
 		SetContext(ctx).
+		SetDebug(false).
+		SetLogger(nil).
 		SetResult(&modelsResponse{}).
 		Get("/models/")
 

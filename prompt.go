@@ -7,9 +7,9 @@ import (
 
 // Prompt 接口, 暴露一个渲染的能力
 type Prompt interface {
-	// Render 渲染，这个用来展示
+	// Render 渲染, 这个用来展示
 	Render(vairables map[string]interface{}) ([]byte, error)
-	// RenderMessages 渲染消息列表，对应的渲染方法是 Render，这个提供给用户自定义使用
+	// RenderMessages 渲染消息列表, 对应的渲染方法是 Render, 提供给用户自定义使用
 	RenderMessages(vairables map[string]interface{}) ([]*Message, error)
 }
 
