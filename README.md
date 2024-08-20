@@ -378,4 +378,185 @@ func SimpleChat() {
 }
 ```
 
-### 🏗
+### 快速生成
+
+使用预定义的模板`prompt` 进行快速的文本生成
+
+⚠️ 这种方式必须手动指定`Query`和`PredefinedPrompt`
+
+```go
+
+func QuickChatCompletion() {
+    client.SetDebug(true)
+    res, err := client.QuickCompletion(
+        context.Background(),
+        fengchao.WithPredefinedPrompts("多译英"),
+        fengchao.WithQuery(`命运之轮象征着命运的起伏和变化，它代表着生活中不可预测的转变和机遇。这张牌可能意味着你正处在一个重要的转折点，你将会经历一些意想不到的改变。这些改变可能会带来新的机会和挑战，需要你灵活适应并做好准备。
+命运之轮也提醒我们，生活中的好运和不幸都是暂时的，一切都在不断变化中。这张牌鼓励你保持乐观和开放的态度，相信未来会带来更好的机会和成长。同时，也要学会珍惜当下，充分利用现有的资源和机会。`),
+    )
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println("结果如下：")
+    fmt.Println(res)
+}
+
+```
+
+### 批量生成
+
+`BatchChatCompletionBuilder`提供了一种，批量进行请求的方法，可以实现并发的请求，等到所有请求都结束后同步返回
+⚠️ 单次批量的调用，最多添加5个
+
+```go
+
+func BatchComplete() {
+
+    client.SetDebug(true)
+    builder := fengchao.NewBatchChatCompletionBuilder()
+
+    one, _ := builder.Add(
+        nil,
+        fengchao.WithPredefinedPrompts("多译英"),
+        fengchao.WithQuery(`命运之轮象征着命运的起伏和变化，它代表着生活中不可预测的转变和机遇。这张牌可能意味着你正处在一个重要的转折点，你将会经历一些意想不到的改变。这些改变可能会带来新的机会和挑战，需要你灵活适应并做好准备。
+命运之轮也提醒我们，生活中的好运和不幸都是暂时的，一切都在不断变化中。这张牌鼓励你保持乐观和开放的态度，相信未来会带来更好的机会和成长。同时，也要学会珍惜当下，充分利用现有的资源和机会。`),
+    )
+
+    two, _ := builder.Add(
+        fengchao.NewPromptTemplate(
+            fengchao.NewMessage(fengchao.RoleUser, `进行一个大阿尔卡那的塔罗牌占卜,使用十字法牌陣🔮`),
+        ),
+    )
+
+    res, fail, complete := client.BatchChatCompletion(context.Background(), builder)
+    if !complete {
+        for k, f := range fail {
+            switch k {
+            case one:
+                fmt.Println("1. 失败原因：")
+            case two:
+                fmt.Println("2. 失败原因：")
+            }
+            fmt.Println(f)
+        }
+    }
+
+    fmt.Println("1. 结果如下：")
+    fmt.Println(res[one])
+
+    fmt.Println("2. 结果如下：")
+    fmt.Println(res[two])
+}
+
+```
+
+### 流式请求
+
+我们可以通过`ChatCompletionStream` 方法，来获取一个`StreamReader`, 然后手动处理数据包
+
+`StreamReader`的`Read`方法，返回三个参数，分别为数据包，是否完成，和错误，可以自行处理其逻辑
+
+流式请求因为要接管`response`, 所以超时时间属性不会起作用，如果需要控制超时时间，需要在外部通过上下文手动控制，内部已经实现上下文的取消策略
+
+```go
+func ReadStream() {
+
+    // client.SetDebug(true)
+
+    ctx := context.Background()
+
+    prompt := fengchao.NewPromptTemplate(
+        fengchao.NewMessage(fengchao.RoleSystem, `你是一个非常厉害的{{.Name}}！`),
+        fengchao.NewMessage(fengchao.RoleUser, `分别讲一个关于{{range .Items}}、{{.}}{{end}}的笑话吧`),
+        fengchao.NewMessage(fengchao.RoleAssistant, `小猫：小猫去银行，工作人员问：“你要存什么？”小猫眨眨眼说：“我存爪印！”
+小狗：小狗学会了打字，但每次发的都是“汪汪汪”，它说：“我这不是在聊天，是在打码！”
+小狐狸：小狐狸问妈妈：“为什么我们叫狡猾？”妈妈笑着说：“因为我们知道怎么用优惠券！”`),
+    )
+
+    res, err := client.ChatCompletionStream(
+        ctx,
+        prompt,
+        fengchao.WithTemperature(1.9),
+        fengchao.WithModel("gpt-4o"),
+        // fengchao.WithIsSensitive(true),
+        fengchao.WithParams(map[string]interface{}{
+            "Items": []string{"中国", "台湾", "香港"},
+            "Name":  "智能助手",
+            "Count": 3,
+        }),
+    )
+
+    if err != nil {
+        panic(err)
+    }
+
+    fmt.Println("结果如下：")
+
+    for {
+        chunk, finished, err := res.Read()
+        if finished {
+            fmt.Println("结束了")
+            break
+        }
+        if err != nil {
+            if errors.Is(err, io.EOF) {
+                fmt.Println("EOF")
+                break
+            }
+            panic(err)
+        }
+
+        fmt.Print((*chunk).String())
+        // time.Sleep(time.Millisecond * 100)
+    }
+    fmt.Print("\n")
+    res.Close()
+}
+
+```
+
+当然我们也提供了一个更简单的方式来进行处理流式的请求，我们内置了一个协程来处理数据包，并在通道中返回数据
+
+```go
+func Stream() {
+    defer func() {
+        if err := recover(); err != nil {
+            fmt.Println("recover error: ", err)
+        }
+    }()
+
+    client.SetDebug(true)
+
+    ctx := context.Background()
+
+    prompt := fengchao.NewPromptTemplate(
+        fengchao.NewMessage(fengchao.RoleUser, `进行一个大阿尔卡那的塔罗牌占卜,使用十字法牌陣🔮`),
+    )
+
+    res, err := client.ChatCompletionStream(
+        ctx,
+        prompt,
+        fengchao.WithTimeout(2), // 流式接口设置超时无效
+        fengchao.WithTemperature(0.9),
+        // fengchao.WithIsSensitive(true),
+    )
+
+    if err != nil {
+        panic("stream error: " + err.Error())
+    }
+
+    fmt.Println("结果如下：")
+    for r := range res.Stream(ctx) {
+        if r == nil {
+            break
+        }
+        fmt.Print((r).String())
+    }
+    fmt.Print("\n")
+}
+
+```
+
+## 更多文档待补充
+
+🏗

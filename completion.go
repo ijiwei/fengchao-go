@@ -10,6 +10,11 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	InvokeMode = "invoke"
+	StreamMode = "stream"
+)
+
 type ChatCompletion struct {
 	// RequestID 请求ID
 	RequestID string `json:"request_id"`
@@ -26,14 +31,19 @@ type ChatCompletion struct {
 	// MaxTokens 最大长度
 	MaxTokens int `json:"max_tokens,omitempty"`
 	// Stop 停用词
-	History []*Message `json:"history"`
+	History []*Message `json:"history,omitempty"`
 	// Query 问题
 	Query string `json:"query"`
 	// System 系统消息
 	System string `json:"system"`
+	// Mode 是否流式返回
+	Mode string `json:"mode,omitempty"`
+	// PredefinedPrompts 预定义的prompt提示工程
+	PredefinedPrompts string `json:"prompt,omitempty"`
 
 	// Variables 变量
 	variables map[string]interface{}
+
 	// Stop 停用词
 	Stop []string
 	// Timeout 超时时间
@@ -59,6 +69,11 @@ func (cc *ChatCompletion) Clone() *ChatCompletion {
 	clone := *cc
 	clone.RequestID = uuid.New().String() // 确保生成新的 RequestID
 	return &clone
+}
+
+// String 转字符串
+func (cc *ChatCompletion) String() string {
+	return fmt.Sprintf("RequestID: %s, Model: %s, Query: %s, Temperature: %f, TopP: %f", cc.RequestID, cc.Model, cc.Query, cc.Temperature, cc.TopP)
 }
 
 // WithModel 设置模型
@@ -110,17 +125,17 @@ func WithTimeout(timeout int) Option[ChatCompletion] {
 	}
 }
 
-// WithHistory 设置历史消息
-func WithHistory(history []*Message) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.History = history
-	}
-}
-
 // WithQuery 设置问题
 func WithQuery(query string) Option[ChatCompletion] {
 	return func(option *ChatCompletion) {
 		option.Query = query
+	}
+}
+
+// withPredefinedPrompts 设置预定义的prompt提示工程
+func WithPredefinedPrompts(predefinedPrompts string) Option[ChatCompletion] {
+	return func(option *ChatCompletion) {
+		option.PredefinedPrompts = predefinedPrompts
 	}
 }
 
@@ -146,53 +161,46 @@ func WithParams(variables any) Option[ChatCompletion] {
 		t = t.Elem()
 	}
 
+	v := reflect.ValueOf(variables)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	var mapVars = make(map[string]interface{})
+
 	// 首先判断是否为结构体
 	if t.Kind() == reflect.Struct {
-		var mapVars = make(map[string]interface{})
 		for i := 0; i < t.NumField(); i++ {
-			current := reflect.ValueOf(variables)
-			if current.Kind() == reflect.Ptr {
-				current = current.Elem()
-			}
-			if !current.Field(i).CanInterface() {
-				fmt.Printf("该字段不可获取 %s\n", t.Field(i).Name)
+			currentField := v.Field(i)
+			if !currentField.CanInterface() {
 				continue
 			}
-			mapVars[t.Field(i).Name] = current.Field(i).Interface()
-		}
-		return func(option *ChatCompletion) {
-			option.variables = mapVars
+			mapVars[t.Field(i).Name] = currentField.Interface()
 		}
 	}
 
-	// 再给一次机会，判断是否为map
+	// 再给一次机会,判断是否为map
 	if t.Kind() == reflect.Map {
 		// 判断是否为map[string]any
 		// 如果不是就不行
 		if t.Key().Kind() == reflect.String {
-			val := reflect.ValueOf(variables)
-			if val.Kind() == reflect.Ptr {
-				val = val.Elem()
-			}
-			var mapVars = make(map[string]interface{})
 			// 遍历
-			for _, key := range val.MapKeys() {
+			for _, key := range v.MapKeys() {
 				// 获取键和对应的值
 				k := key.Interface()
-				v := val.MapIndex(key).Interface()
-
-				mapVars[k.(string)] = v
-			}
-			return func(option *ChatCompletion) {
-				option.variables = mapVars
+				if v.MapIndex(key).CanInterface() {
+					v := v.MapIndex(key).Interface()
+					mapVars[k.(string)] = v
+				}
 			}
 		}
 	}
+
 	return func(option *ChatCompletion) {
-		option.variables = nil
+		option.variables = mapVars
 	}
 }
 
+// WithRequestID 设置请求ID
 func WithRequestID(requestID string) Option[ChatCompletion] {
 	return func(option *ChatCompletion) {
 		option.RequestID = requestID
@@ -209,11 +217,14 @@ func (option *ChatCompletion) Apply(helpers ...Option[ChatCompletion]) {
 // RenderMessages 渲染消息列表
 func (option *ChatCompletion) LoadPromptTemplates(prompt Prompt) ([]*Message, error) {
 	var messages []*Message
+	originalMessages := make([]*Message, len(messages))
+	if prompt == nil {
+		return originalMessages, nil
+	}
 	messages, err := prompt.RenderMessages(option.variables)
 	if err != nil {
 		return nil, fmt.Errorf("render message template with error[%v]", err)
 	}
-	originalMessages := make([]*Message, len(messages))
 	// 去掉第一个是系统消息
 	copy(originalMessages, messages)
 	if messages[0].Role == RoleSystem {
@@ -223,6 +234,9 @@ func (option *ChatCompletion) LoadPromptTemplates(prompt Prompt) ([]*Message, er
 	if len(messages) == 0 {
 		return nil, errors.New("user messages is empty")
 	}
+	if messages[len(messages)-1].Role != RoleUser {
+		return nil, errors.New("last message must be user role message")
+	}
 	query := messages[len(messages)-1].Content
 	messages = messages[:len(messages)-1]
 
@@ -231,6 +245,7 @@ func (option *ChatCompletion) LoadPromptTemplates(prompt Prompt) ([]*Message, er
 	return originalMessages, nil
 }
 
+// ChatCompletionResult 聊天结果
 type ChatCompletionResult struct {
 	RequestID string `json:"request_id"`
 	Object    string `json:"object"`
@@ -251,6 +266,34 @@ type ChatCompletionResult struct {
 	History []*Message
 }
 
+// ChatCompletionError 聊天错误
+type ChatCompletionError struct {
+	Detail []ChatCompletionErrorDetail `json:"detail"`
+}
+
+// String 聊天错误信息
+func (c *ChatCompletionError) String() string {
+	if c.Detail == nil || len(c.Detail) == 0 {
+		return "unknown error"
+	}
+	return c.Detail[0].Msg
+}
+
+// ChatCompletionErrorDetail 聊天错误详情
+type ChatCompletionErrorDetail struct {
+	Msg string `json:"msg"`
+}
+
+// VerifyError 验证错误,实现了StreamAble
+func chatCompletionErrorHandler(ccr ChatCompletionResult) error {
+	if ccr.Status != 200 {
+		return fmt.Errorf("chat completion failed: [%d]%s", ccr.Status, ccr.Msg)
+	}
+
+	return nil
+}
+
+// ChatCompletion 聊天
 func (f *FengChao) ChatCompletion(ctx context.Context, prompt Prompt, chatCompletionOption ...Option[ChatCompletion]) (*ChatCompletionResult, error) {
 	ChatCompletionOption := defaultChatCompletionOption()
 	ChatCompletionOption.Apply(chatCompletionOption...)
@@ -293,6 +336,7 @@ func (f *FengChao) ChatCompletion(ctx context.Context, prompt Prompt, chatComple
 			"Content-Type":  {"application/json"},
 			"Authorization": {token},
 		}).
+		SetError(&ChatCompletionError{}).
 		SetResult(&ChatCompletionResult{}).
 		Post(uri)
 
@@ -303,7 +347,7 @@ func (f *FengChao) ChatCompletion(ctx context.Context, prompt Prompt, chatComple
 		return nil, err
 	}
 	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("response error")
+		return nil, fmt.Errorf("chat completion error: %s", resp.Error().(*ChatCompletionError).String())
 	}
 	if resp.Result().(*ChatCompletionResult).Status != 200 {
 		return nil, fmt.Errorf("error[%d]: %v", resp.Result().(*ChatCompletionResult).Status, resp.Result().(*ChatCompletionResult).Msg)
@@ -316,6 +360,68 @@ func (f *FengChao) ChatCompletion(ctx context.Context, prompt Prompt, chatComple
 	return complettionResult, nil
 }
 
+// QuickCompletion 使用预定义prompt, 快速生成文本
+func (f *FengChao) QuickCompletion(ctx context.Context, chatCompletionOption ...Option[ChatCompletion]) (*ChatCompletionResult, error) {
+	ChatCompletionOption := defaultChatCompletionOption()
+	ChatCompletionOption.Apply(chatCompletionOption...)
+	if ChatCompletionOption.PredefinedPrompts == "" || ChatCompletionOption.Query == "" {
+		return nil, fmt.Errorf("prompt or query is empty")
+	}
+	AvailableModles := f.GetAvailableModels()
+	if AvailableModles == nil {
+		return nil, fmt.Errorf("available model is empty, please check service")
+	}
+	var found *Model
+	currentModel := ChatCompletionOption.Model
+	for _, model := range AvailableModles {
+		if currentModel == model.ID {
+			found = &model
+		}
+	}
+	if found == nil {
+		return nil, fmt.Errorf("unsupport model (%s)", currentModel)
+	}
+
+	var uri = "/chat/"
+	if found.Channel == "本地模型" {
+		uri = "/local_chat/"
+	}
+
+	token, err := f.getAuthToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fail to auth cause: %s", err)
+	}
+	// 设置超时
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(ChatCompletionOption.Timeout)*time.Second)
+	defer cancel()
+	resp, err := f.client.R().
+		SetContext(ctx).
+		SetBody(ChatCompletionOption).
+		SetHeaderMultiValues(map[string][]string{
+			"Content-Type":  {"application/json"},
+			"Authorization": {token},
+		}).
+		SetError(&ChatCompletionError{}).
+		SetResult(&ChatCompletionResult{}).
+		Post(uri)
+
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("request timeout")
+		}
+		return nil, err
+	}
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("chat completion error: %s", resp.Error().(*ChatCompletionError).String())
+	}
+	if resp.Result().(*ChatCompletionResult).Status != 200 {
+		return nil, fmt.Errorf("error[%d]: %v", resp.Result().(*ChatCompletionResult).Status, resp.Result().(*ChatCompletionResult).Msg)
+	}
+	complettionResult := resp.Result().(*ChatCompletionResult)
+	return complettionResult, nil
+}
+
+// String 聊天结果
 func (r *ChatCompletionResult) String() string {
 	if r.Choices == nil || len(r.Choices) == 0 {
 		return ""
@@ -323,6 +429,7 @@ func (r *ChatCompletionResult) String() string {
 	return r.Choices[0].Message.Content
 }
 
+// GetHistoryPrompts 获取历史消息（Prompt）
 func (r *ChatCompletionResult) GetHistoryPrompts() *PromptTemplate {
 	if r.History == nil || len(r.History) == 0 {
 		return nil
