@@ -3,6 +3,7 @@ package fengchaogo
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -34,7 +35,7 @@ type modelsManager struct {
 // GetAvailableModels 获取可用模型
 func (f *FengChao) GetAvailableModels() []Model {
 	if f.availableModels == nil || time.Since(f.availableModels.lastUpdate) > 24*time.Hour {
-		err := f.loadModels(context.Background())
+		err := f.loadModels()
 		if err != nil {
 			return nil
 		}
@@ -43,9 +44,9 @@ func (f *FengChao) GetAvailableModels() []Model {
 }
 
 // loadModels 加载模型
-func (f *FengChao) loadModels(ctx context.Context) error {
+func (f *FengChao) loadModels() error {
 	// 设置超时
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(BasicRequestTimeout)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(BasicRequestTimeout)*time.Second)
 	defer cancel()
 	resp, err := f.client.R().
 		SetContext(ctx).
@@ -66,4 +67,18 @@ func (f *FengChao) loadModels(ctx context.Context) error {
 		lastUpdate: time.Now(),
 	}
 	return nil
+}
+
+// getModel 获取模型
+func (f *FengChao) getModel(name string) (m *Model) {
+	if strings.Contains(name, ",") {
+		name = name[:strings.Index(name, ",")]
+	}
+	// 只校验第一个模型
+	for _, model := range f.GetAvailableModels() {
+		if name == model.ID {
+			m = &model
+		}
+	}
+	return m
 }
