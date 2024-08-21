@@ -68,15 +68,24 @@ func (m *PromptTemplate) execute(vairables map[string]interface{}) error {
 	for _, item := range m.Prompts {
 		switch item := item.(type) {
 		case *PromptTemplate:
+			if item == nil {
+				continue
+			}
 			promptTemplate := item
 			if err := promptTemplate.execute(vairables); err != nil {
 				return err
 			}
 			m.Messages = append(m.Messages, promptTemplate.Messages...)
 		case *Message:
+			if item == nil {
+				continue
+			}
 			message := item
 			m.Messages = append(m.Messages, message)
 		case lazyMessage:
+			if item == nil {
+				continue
+			}
 			message, err := item()
 			if err != nil {
 				return fmt.Errorf("load lazy message error cause %v", err)

@@ -111,7 +111,6 @@ func (message lazyMessage) RenderMessages(vairables map[string]interface{}) ([]*
 
 // NewMessage 生成消息（这个消息是预渲染的消息）
 func NewMessage(role string, messageStr string) lazyMessage {
-
 	return func() (*Message, error) {
 		template, err := template.New("").Parse(messageStr)
 		if err != nil {
@@ -119,4 +118,19 @@ func NewMessage(role string, messageStr string) lazyMessage {
 		}
 		return &Message{Role: role, template: template}, nil
 	}
+}
+
+// NewSystemMessage 生成系统消息
+func NewSystemMessage(messageStr string) lazyMessage {
+	return NewMessage(RoleSystem, messageStr)
+}
+
+// NewUserMessage 生成用户消息
+func NewUserMessage(messageStr string) lazyMessage {
+	return NewMessage(RoleUser, messageStr)
+}
+
+// NewAssistantMessage 生成机器人消息
+func NewAssistantMessage(messageStr string) lazyMessage {
+	return NewMessage(RoleAssistant, messageStr)
 }

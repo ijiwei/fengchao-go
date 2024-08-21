@@ -22,10 +22,10 @@ type tokenResponse struct {
 }
 
 // getAuthToken 获取token
-func (f *FengChao) getAuthToken(ctx context.Context) (string, error) {
+func (f *FengChao) getAuthToken() (string, error) {
 
 	if f.auth == nil || time.Since(f.auth.expiresAt) > time.Duration(ExpiresTime)*time.Second {
-		err := f.refreshToken(ctx)
+		err := f.refreshToken()
 		if err != nil {
 			return "", err
 		}
@@ -35,9 +35,9 @@ func (f *FengChao) getAuthToken(ctx context.Context) (string, error) {
 }
 
 // refreshToken 刷新token
-func (f *FengChao) refreshToken(ctx context.Context) error {
+func (f *FengChao) refreshToken() error {
 	// 设置超时
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(BasicRequestTimeout)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(BasicRequestTimeout)*time.Second)
 	defer cancel()
 	resp, err := f.client.R().
 		SetContext(ctx).

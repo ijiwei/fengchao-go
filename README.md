@@ -557,6 +557,92 @@ func Stream() {
 
 ```
 
-## 更多文档待补充
+## 支持历史记录的聊天对话示例
 
-🏗
+```go
+
+import (
+    "bufio"
+    "context"
+    "fmt"
+    "os"
+
+    fengchao "github.com/ijiwei/fengchao-go"
+)
+
+var client = fengchao.NewFengChao(os.Getenv("FENGCHAO_KEY"), os.Getenv("FENGCHAO_SECRET"), os.Getenv("FENGCHAO_BASE_URL"))
+
+var systemMessage = fengchao.NewMessage(fengchao.RoleSystem, `你是一名善于理解问题的助手，你要按照以下的规则与用户对话:
+1. 采用风趣幽默的回答，适当添加Emoji来让回答更加形象
+2. 回答的内容尽可能丰富，如果篇幅过长，你可以先对问题进行总结并生成大纲，并通过多次对话的方式分步进行回答
+3. 你的回答要有主观性，不要拿用户的意见和建议作为依据
+`)
+
+func ChatBox() {
+    fmt.Println("FENGCHAO-CHATBOX")
+    fmt.Println("---------------------")
+    fmt.Print("> ")
+    s := bufio.NewScanner(os.Stdin)
+    var historyMessage *fengchao.PromptTemplate
+    for s.Scan() {
+        input := s.Text()
+
+        switch input {
+        case ":clear":
+            historyMessage = nil
+            fmt.Println("已清除历史消息\n>")
+            continue
+        case ":exit":
+            return
+        case ":history":
+            historyDisplay(historyMessage)
+            continue
+        case "":
+            continue
+        }
+
+        inputMessage := fengchao.NewMessage(fengchao.RoleUser, input)
+        res, err := client.ChatCompletionStreamSimple(
+            context.Background(),
+            fengchao.NewPromptTemplate(
+                systemMessage,
+                historyMessage,
+                inputMessage,
+            ),
+            fengchao.WithIsSensitive(true),
+            fengchao.WithModel("gpt-4o"),
+        )
+        if err != nil {
+            panic(err)
+        }
+
+        answer := ""
+        for r := range res {
+            if r == nil {
+                break
+            }
+            fmt.Print(r)
+            answer = answer + r.String()
+        }
+
+        historyMessage = fengchao.NewPromptTemplate(
+            historyMessage,
+            inputMessage,
+            fengchao.NewMessage(fengchao.RoleAssistant, answer),
+        )
+        fmt.Print("\n> ")
+    }
+}
+
+func historyDisplay(history *fengchao.PromptTemplate) {
+    if history == nil {
+        fmt.Println("没有历史消息")
+        fmt.Print("> ")
+    }
+    messages, _ := history.RenderMessages(nil)
+    for _, m := range messages {
+        fmt.Printf(">> %s: %s\n", m.Role, m.Content)
+    }
+    fmt.Print("> ")
+}
+```

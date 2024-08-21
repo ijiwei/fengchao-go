@@ -15,32 +15,23 @@ func (f *FengChao) ChatCompletionStream(ctx context.Context, prompt Prompt, chat
 	ChatCompletionOption := defaultChatCompletionOption()
 	ChatCompletionOption.Mode = StreamMode
 	ChatCompletionOption.Apply(chatCompletionOption...)
+	
 	_, err := ChatCompletionOption.LoadPromptTemplates(prompt)
 	if err != nil {
 		return nil, fmt.Errorf("fail to load prompt template cause: %s", err)
 	}
 
-	AvailableModles := f.GetAvailableModels()
-	if AvailableModles == nil {
-		return nil, fmt.Errorf("available model is empty, please check service")
-	}
-	var found *Model
-	currentModel := ChatCompletionOption.Model
-	for _, model := range AvailableModles {
-		if currentModel == model.ID {
-			found = &model
-		}
-	}
-	if found == nil {
-		return nil, fmt.Errorf("unsupport model (%s)", currentModel)
+	model := f.getModel(ChatCompletionOption.Model)
+	if model == nil {
+		return nil, fmt.Errorf("unsupport model (%s)", ChatCompletionOption.Model)
 	}
 
 	var uri = "/chat/"
-	if found.Channel == "本地模型" {
+	if model.Channel == "本地模型" {
 		uri = "/local_chat/"
 	}
 
-	token, err := f.getAuthToken(ctx)
+	token, err := f.getAuthToken()
 	if err != nil {
 		return nil, fmt.Errorf("fail to auth cause: %s", err)
 	}
@@ -64,8 +55,8 @@ func (f *FengChao) ChatCompletionStream(ctx context.Context, prompt Prompt, chat
 	}
 
 	reader := &JsonStreamReader[ChatCompletionResult]{
-		reader: bufio.NewReader(resp.RawResponse.Body),
-		resp:   resp.RawResponse,
+		reader:       bufio.NewReader(resp.RawResponse.Body),
+		resp:         resp.RawResponse,
 		errorHandler: chatCompletionErrorHandler,
 	}
 

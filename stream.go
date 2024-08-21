@@ -160,7 +160,6 @@ func (j *JsonStreamReader[T]) Stream(ctx context.Context) <-chan *T {
 		for {
 			msg, finished, err := j.Read()
 			if ctx.Err() != nil {
-				fmt.Println("context cancel error")
 				return
 			}
 			if finished {
