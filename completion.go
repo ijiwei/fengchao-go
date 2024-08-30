@@ -45,9 +45,9 @@ type ChatCompletion struct {
 	variables map[string]interface{}
 
 	// Stop 停用词
-	Stop []string
+	Stop []string `json:"-"`
 	// Timeout 超时时间
-	Timeout int
+	Timeout int `json:"-"`
 }
 
 // DefaultChatCompletionOption 默认配置, 可以覆盖
@@ -268,20 +268,12 @@ type ChatCompletionResult struct {
 
 // ChatCompletionError 聊天错误
 type ChatCompletionError struct {
-	Detail []ChatCompletionErrorDetail `json:"detail"`
+	Detail string `json:"detail"`
 }
 
 // String 聊天错误信息
 func (c *ChatCompletionError) String() string {
-	if c.Detail == nil || len(c.Detail) == 0 {
-		return "unknown error"
-	}
-	return c.Detail[0].Msg
-}
-
-// ChatCompletionErrorDetail 聊天错误详情
-type ChatCompletionErrorDetail struct {
-	Msg string `json:"msg"`
+	return c.Detail
 }
 
 // VerifyError 验证错误,实现了StreamAble
@@ -404,9 +396,11 @@ func (f *FengChao) QuickCompletion(ctx context.Context, chatCompletionOption ...
 	return complettionResult, nil
 }
 
-// String 聊天结果
 func (r *ChatCompletionResult) String() string {
-	if r.Choices == nil || len(r.Choices) == 0 {
+	if r.Choices == nil {
+		return ""
+	}
+	if len(r.Choices) == 0 {
 		return ""
 	}
 	return r.Choices[0].Message.Content
@@ -414,7 +408,10 @@ func (r *ChatCompletionResult) String() string {
 
 // GetHistoryPrompts 获取历史消息（Prompt）
 func (r *ChatCompletionResult) GetHistoryPrompts() *PromptTemplate {
-	if r.History == nil || len(r.History) == 0 {
+	if r.History == nil {
+		return nil
+	}
+	if len(r.History) == 0 {
 		return nil
 	}
 	prompts := make([]Prompt, 0)
