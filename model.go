@@ -29,12 +29,12 @@ type modelsResponse struct {
 // modelsManager 模型管理器
 type modelsManager struct {
 	models     []Model
-	lastUpdate time.Time
+	updatedAt time.Time
 }
 
 // GetAvailableModels 获取可用模型
 func (f *FengChao) GetAvailableModels() []Model {
-	if f.availableModels == nil || time.Since(f.availableModels.lastUpdate) > 24*time.Hour {
+	if f.availableModels == nil || time.Since(f.availableModels.updatedAt) > 24*time.Hour {
 		err := f.loadModels()
 		if err != nil {
 			return nil
@@ -64,7 +64,7 @@ func (f *FengChao) loadModels() error {
 
 	f.availableModels = &modelsManager{
 		models:     resp.Result().(*modelsResponse).Data,
-		lastUpdate: time.Now(),
+		updatedAt: time.Now(),
 	}
 	return nil
 }

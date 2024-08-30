@@ -11,7 +11,7 @@ const ExpiresTime = 1700
 // authManager 授权控制器
 type authManager struct {
 	accessToken string
-	expiresAt   time.Time
+	refreshAt   time.Time
 }
 
 // tokenResponse token响应
@@ -24,7 +24,7 @@ type tokenResponse struct {
 // getAuthToken 获取token
 func (f *FengChao) getAuthToken() (string, error) {
 
-	if f.auth == nil || time.Since(f.auth.expiresAt) > time.Duration(ExpiresTime)*time.Second {
+	if f.auth == nil || time.Since(f.auth.refreshAt) > time.Duration(ExpiresTime)*time.Second {
 		err := f.refreshToken()
 		if err != nil {
 			return "", err
@@ -62,7 +62,7 @@ func (f *FengChao) refreshToken() error {
 
 	f.auth = &authManager{
 		accessToken: resp.Result().(*tokenResponse).Token,
-		expiresAt:   time.Now().Add(time.Duration(ExpiresTime) * time.Second),
+		refreshAt:   time.Now(),
 	}
 
 	return nil

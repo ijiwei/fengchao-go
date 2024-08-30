@@ -15,7 +15,7 @@ func (f *FengChao) ChatCompletionStream(ctx context.Context, prompt Prompt, chat
 	ChatCompletionOption := defaultChatCompletionOption()
 	ChatCompletionOption.Mode = StreamMode
 	ChatCompletionOption.Apply(chatCompletionOption...)
-	
+
 	_, err := ChatCompletionOption.LoadPromptTemplates(prompt)
 	if err != nil {
 		return nil, fmt.Errorf("fail to load prompt template cause: %s", err)
@@ -82,9 +82,6 @@ func handleErrorResponse(resp *http.Response) error {
 	err = json.Unmarshal([]byte(data), &chatCompletionError)
 	if err != nil {
 		return fmt.Errorf("response error: %s", data)
-	}
-	if len(chatCompletionError.Detail) == 0 {
-		return fmt.Errorf("chat completion unknown error")
 	}
 	return fmt.Errorf("chat completion error: %s", chatCompletionError.String())
 }
