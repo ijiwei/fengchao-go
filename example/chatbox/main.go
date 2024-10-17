@@ -47,7 +47,7 @@ func ChatBox() {
 		}
 
 		inputMessage := fengchaogo.NewMessage(fengchaogo.RoleUser, input)
-		res, err := client.ChatCompletionStreamSimple(
+		res, err := client.ChatCompletionStream(
 			context.Background(),
 			fengchaogo.NewPromptTemplate(
 				systemMessage,
@@ -55,18 +55,15 @@ func ChatBox() {
 				inputMessage,
 			),
 			fengchaogo.WithIsSensitive(true),
-			fengchaogo.WithModel("gpt-4o"),
+			fengchaogo.WithModel("glm-4"),
 		)
 		if err != nil {
 			panic(err)
 		}
 
 		answer := ""
-		for r := range res {
-			if r == nil {
-				break
-			}
-			fmt.Print(r)
+		for r := range res.Stream() {
+			fmt.Print(r.String())
 			answer = answer + r.String()
 		}
 

@@ -3,11 +3,11 @@ package fengchaogo
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"net/http"
 )
 
@@ -150,28 +150,23 @@ func (j *JsonStreamReader[T]) Read() (*T, bool, error) {
 	}
 }
 
-// Stream 返回一个可用于读取生成内容的数据包的channel, 注意会引起恐慌panic, 需要自己处理panic
-func (j *JsonStreamReader[T]) Stream(ctx context.Context) <-chan *T {
-	ch := make(chan *T)
-	go func(ctx context.Context) {
-		// 设置超时
-		defer close(ch)
+// Stream 返回一个生成器函数
+func (j *JsonStreamReader[T]) Stream() iter.Seq[T] {
+	return func(yield func(T) bool) {
 		defer j.Close()
 		for {
 			msg, finished, err := j.Read()
-			if ctx.Err() != nil {
-				return
-			}
 			if finished {
 				return
 			}
 			if err != nil {
 				panic(err)
 			}
-			ch <- msg
+			if !yield(*msg) {
+				return
+			}
 		}
-	}(ctx)
-	return ch
+	}
 }
 
 // Close 关闭数据流

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/google/uuid"
@@ -76,159 +75,28 @@ func (cc *ChatCompletion) String() string {
 	return fmt.Sprintf("RequestID: %s, Model: %s, Query: %s, Temperature: %f, TopP: %f", cc.RequestID, cc.Model, cc.Query, cc.Temperature, cc.TopP)
 }
 
-// WithModel 设置模型
-func WithModel(model string) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.Model = model
-	}
-}
-
-// WithTemperature 设置模型参数
-func WithTemperature(temperature float64) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.Temperature = temperature
-	}
-}
-
-// WithTopP 设置模型参数
-func WithTopP(topP float64) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.TopP = topP
-	}
-}
-
-// WithDoSample 设置是否开启采样
-func WithDoSample(doSample bool) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.DoSample = doSample
-	}
-}
-
-// WithMaxTokens 设置最大长度
-func WithMaxTokens(maxTokens int) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.MaxTokens = maxTokens
-	}
-}
-
-// WithStop 设置停用词
-func WithStop(stop []string) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.Stop = stop
-	}
-}
-
-// WithTimeout 设置超时时间
-func WithTimeout(timeout int) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.Timeout = timeout
-	}
-}
-
-// WithQuery 设置问题
-func WithQuery(query string) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.Query = query
-	}
-}
-
-// withPredefinedPrompts 设置预定义的prompt提示工程
-func WithPredefinedPrompts(predefinedPrompts string) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.PredefinedPrompts = predefinedPrompts
-	}
-}
-
-// WithSystem 设置系统消息
-func WithSystem(system string) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.System = system
-	}
-}
-
-// WithIsSensitive 设置是否开启敏感词
-func WithIsSensitive(isSensitive bool) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.IsSensitive = isSensitive
-	}
-}
-
-// WithVariables 设置变量
-func WithParams(variables any) Option[ChatCompletion] {
-	t := reflect.TypeOf(variables)
-	// 先判断是否为指针类型
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	v := reflect.ValueOf(variables)
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
-	var mapVars = make(map[string]interface{})
-
-	// 首先判断是否为结构体
-	if t.Kind() == reflect.Struct {
-		for i := 0; i < t.NumField(); i++ {
-			currentField := v.Field(i)
-			if !currentField.CanInterface() {
-				continue
-			}
-			mapVars[t.Field(i).Name] = currentField.Interface()
-		}
-	}
-
-	// 再给一次机会,判断是否为map
-	if t.Kind() == reflect.Map {
-		// 判断是否为map[string]any
-		// 如果不是就不行
-		if t.Key().Kind() == reflect.String {
-			// 遍历
-			for _, key := range v.MapKeys() {
-				// 获取键和对应的值
-				k := key.Interface()
-				if v.MapIndex(key).CanInterface() {
-					v := v.MapIndex(key).Interface()
-					mapVars[k.(string)] = v
-				}
-			}
-		}
-	}
-
-	return func(option *ChatCompletion) {
-		option.variables = mapVars
-	}
-}
-
-// WithRequestID 设置请求ID
-func WithRequestID(requestID string) Option[ChatCompletion] {
-	return func(option *ChatCompletion) {
-		option.RequestID = requestID
-	}
-}
-
 // Apply 应用配置
-func (option *ChatCompletion) Apply(helpers ...Option[ChatCompletion]) {
+func (cc *ChatCompletion) Apply(helpers ...Option[ChatCompletion]) {
 	for _, helper := range helpers {
-		helper(option)
+		helper(cc)
 	}
 }
 
 // RenderMessages 渲染消息列表
-func (option *ChatCompletion) LoadPromptTemplates(prompt Prompt) ([]*Message, error) {
+func (cc *ChatCompletion) LoadPromptTemplates(prompt Prompt) ([]*Message, error) {
 	var messages []*Message
 	originalMessages := make([]*Message, len(messages))
 	if prompt == nil {
 		return originalMessages, nil
 	}
-	messages, err := prompt.RenderMessages(option.variables)
+	messages, err := prompt.RenderMessages(cc.variables)
 	if err != nil {
 		return nil, fmt.Errorf("render message template with error[%v]", err)
 	}
 	// 去掉第一个是系统消息
 	copy(originalMessages, messages)
 	if messages[0].Role == RoleSystem {
-		option.System = messages[0].Content
+		cc.System = messages[0].Content
 		messages = messages[1:]
 	}
 	if len(messages) == 0 {
@@ -240,9 +108,16 @@ func (option *ChatCompletion) LoadPromptTemplates(prompt Prompt) ([]*Message, er
 	query := messages[len(messages)-1].Content
 	messages = messages[:len(messages)-1]
 
-	option.Query = query
-	option.History = messages
+	cc.Query = query
+	cc.History = messages
 	return originalMessages, nil
+}
+
+// 使用配置创建一个ChatCompletion参数
+func NewChatCompletion(helpers ...Option[ChatCompletion]) *ChatCompletion {
+	ChatCompletionOption := defaultChatCompletionOption()
+	ChatCompletionOption.Apply(helpers...)
+	return ChatCompletionOption
 }
 
 // ChatCompletionResult 聊天结果
@@ -272,8 +147,8 @@ type ChatCompletionError struct {
 }
 
 // String 聊天错误信息
-func (c *ChatCompletionError) String() string {
-	return c.Detail
+func (cce *ChatCompletionError) String() string {
+	return cce.Detail
 }
 
 // VerifyError 验证错误,实现了StreamAble
@@ -285,117 +160,11 @@ func chatCompletionErrorHandler(ccr ChatCompletionResult) error {
 	return nil
 }
 
-// ChatCompletion 聊天
-func (f *FengChao) ChatCompletion(ctx context.Context, prompt Prompt, chatCompletionOption ...Option[ChatCompletion]) (*ChatCompletionResult, error) {
-	ChatCompletionOption := defaultChatCompletionOption()
-	ChatCompletionOption.Apply(chatCompletionOption...)
-
-	originalMessages, err := ChatCompletionOption.LoadPromptTemplates(prompt)
-	if err != nil {
-		return nil, fmt.Errorf("fail to load prompt template cause: %s", err)
-	}
-
-	model := f.getModel(ChatCompletionOption.Model)
-	if model == nil {
-		return nil, fmt.Errorf("unsupport model (%s)", ChatCompletionOption.Model)
-	}
-
-	var uri = "/chat/"
-	if model.Channel == "本地模型" {
-		uri = "/local_chat/"
-	}
-
-	token, err := f.getAuthToken()
-	if err != nil {
-		return nil, fmt.Errorf("fail to auth cause: %s", err)
-	}
-	// 设置超时
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(ChatCompletionOption.Timeout)*time.Second)
-	defer cancel()
-	resp, err := f.client.R().
-		SetContext(ctx).
-		SetBody(ChatCompletionOption).
-		SetHeaderMultiValues(map[string][]string{
-			"Content-Type":  {"application/json"},
-			"Authorization": {token},
-		}).
-		SetError(&ChatCompletionError{}).
-		SetResult(&ChatCompletionResult{}).
-		Post(uri)
-
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, fmt.Errorf("request timeout")
-		}
-		return nil, err
-	}
-	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("chat completion error: %s", resp.Error().(*ChatCompletionError).String())
-	}
-	if resp.Result().(*ChatCompletionResult).Status != 200 {
-		return nil, fmt.Errorf("error[%d]: %v", resp.Result().(*ChatCompletionResult).Status, resp.Result().(*ChatCompletionResult).Msg)
-	}
-	complettionResult := resp.Result().(*ChatCompletionResult)
-	complettionResult.History = append(originalMessages, &Message{
-		Role:    RoleAssistant,
-		Content: complettionResult.String(),
-	})
-	return complettionResult, nil
+func (ccr *ChatCompletionResult) HandleError() error {
+	return chatCompletionErrorHandler(*ccr)
 }
 
-// QuickCompletion 使用预定义prompt, 快速生成文本
-func (f *FengChao) QuickCompletion(ctx context.Context, chatCompletionOption ...Option[ChatCompletion]) (*ChatCompletionResult, error) {
-	ChatCompletionOption := defaultChatCompletionOption()
-	ChatCompletionOption.Apply(chatCompletionOption...)
-
-	if ChatCompletionOption.PredefinedPrompts == "" || ChatCompletionOption.Query == "" {
-		return nil, fmt.Errorf("prompt or query is empty")
-	}
-
-	model := f.getModel(ChatCompletionOption.Model)
-	if model == nil {
-		return nil, fmt.Errorf("unsupport model (%s)", ChatCompletionOption.Model)
-	}
-
-	var uri = "/chat/"
-	if model.Channel == "本地模型" {
-		uri = "/local_chat/"
-	}
-
-	token, err := f.getAuthToken()
-	if err != nil {
-		return nil, fmt.Errorf("fail to auth cause: %s", err)
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(ChatCompletionOption.Timeout)*time.Second)
-	defer cancel()
-	resp, err := f.client.R().
-		SetContext(ctx).
-		SetBody(ChatCompletionOption).
-		SetHeaderMultiValues(map[string][]string{
-			"Content-Type":  {"application/json"},
-			"Authorization": {token},
-		}).
-		SetError(&ChatCompletionError{}).
-		SetResult(&ChatCompletionResult{}).
-		Post(uri)
-
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, fmt.Errorf("request timeout")
-		}
-		return nil, err
-	}
-	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("chat completion error: %s", resp.Error().(*ChatCompletionError).String())
-	}
-	if resp.Result().(*ChatCompletionResult).Status != 200 {
-		return nil, fmt.Errorf("error[%d]: %v", resp.Result().(*ChatCompletionResult).Status, resp.Result().(*ChatCompletionResult).Msg)
-	}
-	complettionResult := resp.Result().(*ChatCompletionResult)
-	return complettionResult, nil
-}
-
+// String 获取结果的正文内容字符串
 func (r *ChatCompletionResult) String() string {
 	if r.Choices == nil {
 		return ""
@@ -419,4 +188,102 @@ func (r *ChatCompletionResult) GetHistoryPrompts() *PromptTemplate {
 		prompts = append(prompts, m)
 	}
 	return NewPromptTemplate(prompts...)
+}
+
+// ChatCompletion 聊天
+func (f *FengChao) ChatCompletion(ctx context.Context, prompt Prompt, chatCompletionOption ...Option[ChatCompletion]) (*ChatCompletionResult, error) {
+	ChatCompletionParams := NewChatCompletion(chatCompletionOption...)
+
+	originalMessages, err := ChatCompletionParams.LoadPromptTemplates(prompt)
+	if err != nil {
+		return nil, fmt.Errorf("fail to load prompt template cause: %s", err)
+	}
+
+	token, err := f.getAuthToken()
+	if err != nil {
+		return nil, fmt.Errorf("auth failed, %s", err)
+	}
+
+	// 设置超时
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(ChatCompletionParams.Timeout)*time.Second)
+	defer cancel()
+	resp, err := f.client.R().
+		SetContext(ctx).
+		SetBody(ChatCompletionParams).
+		SetHeaderMultiValues(map[string][]string{
+			"Content-Type":  {"application/json"},
+			"Authorization": {token},
+		}).
+		SetError(&ChatCompletionError{}).
+		SetResult(&ChatCompletionResult{}).
+		Post("/chat/")
+
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("request timeout")
+		}
+		return nil, err
+	}
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("chat completion error: %s", resp.Error().(*ChatCompletionError).String())
+	}
+
+	complettionResult := resp.Result().(*ChatCompletionResult)
+
+	if err := complettionResult.HandleError(); err != nil {
+		return complettionResult, err
+	}
+
+	complettionResult.History = append(originalMessages, &Message{
+		Role:    RoleAssistant,
+		Content: complettionResult.String(),
+	})
+
+	return complettionResult, nil
+}
+
+// QuickCompletion 使用预定义prompt, 快速生成文本
+func (f *FengChao) QuickCompletion(ctx context.Context, chatCompletionOption ...Option[ChatCompletion]) (*ChatCompletionResult, error) {
+	ChatCompletionParams := NewChatCompletion(chatCompletionOption...)
+
+	if ChatCompletionParams.PredefinedPrompts == "" || ChatCompletionParams.Query == "" {
+		return nil, fmt.Errorf("prompt or query is empty")
+	}
+
+	token, err := f.getAuthToken()
+	if err != nil {
+		return nil, fmt.Errorf("fail to auth cause: %s", err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(ChatCompletionParams.Timeout)*time.Second)
+	defer cancel()
+	resp, err := f.client.R().
+		SetContext(ctx).
+		SetBody(ChatCompletionParams).
+		SetHeaderMultiValues(map[string][]string{
+			"Content-Type":  {"application/json"},
+			"Authorization": {token},
+		}).
+		SetError(&ChatCompletionError{}).
+		SetResult(&ChatCompletionResult{}).
+		Post("/chat/")
+
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("request timeout")
+		}
+		return nil, err
+	}
+
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("chat completion error: %s", resp.Error().(*ChatCompletionError).String())
+	}
+
+	complettionResult := resp.Result().(*ChatCompletionResult)
+
+	if err := complettionResult.HandleError(); err != nil {
+		return complettionResult, err
+	}
+
+	return complettionResult, nil
 }
