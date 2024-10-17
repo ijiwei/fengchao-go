@@ -9,10 +9,9 @@ import (
 	"os"
 
 	fengchao "github.com/ijiwei/fengchao-go"
-	fengchaogo "github.com/ijiwei/fengchao-go"
 )
 
-var client = fengchaogo.NewFengChao(os.Getenv("FENGCHAO_KEY"), os.Getenv("FENGCHAO_SECRET"), os.Getenv("FENGCHAO_BASE_URL"))
+var client = fengchao.NewFengChao(os.Getenv("FENGCHAO_KEY"), os.Getenv("FENGCHAO_SECRET"), os.Getenv("FENGCHAO_BASE_URL"))
 
 const systemPrompt = `
 你是一名有多年经验的文字内容创作者，你的工作内容包含：
