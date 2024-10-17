@@ -7,7 +7,7 @@ import (
 )
 
 // BatchSize 批量请求最大数量
-const BatchSize = 5
+const BatchMaxSize = 5
 
 // BatchChatCompletionArgs 批量请求参数
 type BatchChatCompletionArgs struct {
@@ -24,13 +24,13 @@ type BatchChatCompletionBuilder struct {
 // NewBatchChatCompletionBuilder 创建
 func NewBatchChatCompletionBuilder() *BatchChatCompletionBuilder {
 	return &BatchChatCompletionBuilder{
-		Args: make([]*BatchChatCompletionArgs, 0, BatchSize),
+		Args: make([]*BatchChatCompletionArgs, 0, BatchMaxSize),
 	}
 }
 
 // Add 添加
 func (bccb *BatchChatCompletionBuilder) Add(prompt Prompt, params ...Option[ChatCompletion]) (*BatchChatCompletionArgs, error) {
-	if bccb.size >= BatchSize {
+	if bccb.size >= BatchMaxSize {
 		return nil, fmt.Errorf("batch size exceeded")
 	}
 	arg := &BatchChatCompletionArgs{

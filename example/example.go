@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	fengchao "github.com/ijiwei/fengchao-go"
+	fengchaogo "github.com/ijiwei/fengchao-go"
 )
 
-var client = fengchao.NewFengChao("33fb16da59ef11ef861680615f1e1c07", "2fc28a69d0e8480188386031a226fa2f", "http://124.126.18.4:6000/aigc/")
+var client = fengchaogo.NewFengChao(os.Getenv("FENGCHAO_KEY"), os.Getenv("FENGCHAO_SECRET"), os.Getenv("FENGCHAO_BASE_URL"))
 
 const systemPrompt = `
 你是一名有多年经验的文字内容创作者，你的工作内容包含：
@@ -110,9 +112,6 @@ func PromptUseCaseTwo() {
 }
 
 func SimpleChat() {
-
-	// client.SetLogger(logrus.StandardLogger())
-	// client.SetDebug(true)
 
 	res, err := client.ChatCompletion(
 		context.Background(),
@@ -218,6 +217,7 @@ func ReadStream() {
 		fengchao.NewMessage(fengchao.RoleAssistant, `小猫：小猫去银行，工作人员问：“你要存什么？”小猫眨眨眼说：“我存爪印！”
 小狗：小狗学会了打字，但每次发的都是“汪汪汪”，它说：“我这不是在聊天，是在打码！”
 小狐狸：小狐狸问妈妈：“为什么我们叫狡猾？”妈妈笑着说：“因为我们知道怎么用优惠券！”`),
+		fengchao.NewUserMessage("再讲一个"),
 	)
 
 	res, err := client.ChatCompletionStream(
@@ -242,7 +242,6 @@ func ReadStream() {
 	for {
 		chunk, finished, err := res.Read()
 		if finished {
-			fmt.Println("结束了")
 			break
 		}
 		if err != nil {
@@ -254,7 +253,6 @@ func ReadStream() {
 		}
 
 		fmt.Print((*chunk).String())
-		// time.Sleep(time.Millisecond * 100)
 	}
 	fmt.Print("\n")
 	res.Close()
@@ -263,7 +261,7 @@ func ReadStream() {
 func Stream() {
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println("recover error: ", err)
+			fmt.Println(err)
 		}
 	}()
 
@@ -280,18 +278,16 @@ func Stream() {
 		prompt,
 		fengchao.WithTimeout(2), // 流式接口设置超时无效
 		fengchao.WithTemperature(0.9),
+		fengchao.WithModel("glm-41"),
 		// fengchao.WithIsSensitive(true),
 	)
 
 	if err != nil {
-		panic("stream error: " + err.Error())
+		panic("ChatCompletionStream Failed: " + err.Error())
 	}
 
 	fmt.Println("结果如下：")
-	for r := range res.Stream(ctx) {
-		if r == nil {
-			break
-		}
+	for r := range res.Stream() {
 		fmt.Print((r).String())
 	}
 	fmt.Print("\n")
@@ -302,6 +298,7 @@ func QuickChatCompletion() {
 	res, err := client.QuickCompletion(
 		context.Background(),
 		fengchao.WithPredefinedPrompts("多译英"),
+		fengchao.WithModel("gpt-4o,moonshot-v1-128k"),
 		fengchao.WithQuery(`命运之轮象征着命运的起伏和变化，它代表着生活中不可预测的转变和机遇。这张牌可能意味着你正处在一个重要的转折点，你将会经历一些意想不到的改变。这些改变可能会带来新的机会和挑战，需要你灵活适应并做好准备。
 命运之轮也提醒我们，生活中的好运和不幸都是暂时的，一切都在不断变化中。这张牌鼓励你保持乐观和开放的态度，相信未来会带来更好的机会和成长。同时，也要学会珍惜当下，充分利用现有的资源和机会。`),
 	)
@@ -351,5 +348,5 @@ func BatchComplete() {
 }
 
 func main() {
-	BatchComplete()
+	ReadStream()
 }

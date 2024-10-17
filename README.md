@@ -515,7 +515,7 @@ func ReadStream() {
 
 ```
 
-当然我们也提供了一个更简单的方式来进行处理流式的请求，我们内置了一个协程来处理数据包，并在通道中返回数据
+当然我们也提供了一个更简单的方式来进行处理流式的请求，我们提供一个go1.23.0的新特性的生成器函数
 
 ```go
 func Stream() {
@@ -546,10 +546,7 @@ func Stream() {
     }
 
     fmt.Println("结果如下：")
-    for r := range res.Stream(ctx) {
-        if r == nil {
-            break
-        }
+    for r := range res.Stream() {
         fmt.Print((r).String())
     }
     fmt.Print("\n")
@@ -602,26 +599,23 @@ func ChatBox() {
         }
 
         inputMessage := fengchao.NewMessage(fengchao.RoleUser, input)
-        res, err := client.ChatCompletionStreamSimple(
+        res, err := client.ChatCompletionStream(
             context.Background(),
-            fengchao.NewPromptTemplate(
+            fengchaogo.NewPromptTemplate(
                 systemMessage,
                 historyMessage,
                 inputMessage,
             ),
-            fengchao.WithIsSensitive(true),
-            fengchao.WithModel("gpt-4o"),
+            fengchaogo.WithIsSensitive(true),
+            fengchaogo.WithModel("glm-4"),
         )
         if err != nil {
             panic(err)
         }
 
         answer := ""
-        for r := range res {
-            if r == nil {
-                break
-            }
-            fmt.Print(r)
+        for r := range res.Stream() {
+            fmt.Print(r.String())
             answer = answer + r.String()
         }
 

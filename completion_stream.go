@@ -7,28 +7,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"net/http"
 )
 
 // ChatCompletionStream 流式聊天
 func (f *FengChao) ChatCompletionStream(ctx context.Context, prompt Prompt, chatCompletionOption ...Option[ChatCompletion]) (*JsonStreamReader[ChatCompletionResult], error) {
-	ChatCompletionOption := defaultChatCompletionOption()
-	ChatCompletionOption.Mode = StreamMode
-	ChatCompletionOption.Apply(chatCompletionOption...)
+	ChatCompletionParams := NewChatCompletion(chatCompletionOption...)
+	ChatCompletionParams.Mode = StreamMode
 
-	_, err := ChatCompletionOption.LoadPromptTemplates(prompt)
+	_, err := ChatCompletionParams.LoadPromptTemplates(prompt)
 	if err != nil {
 		return nil, fmt.Errorf("fail to load prompt template cause: %s", err)
-	}
-
-	model := f.getModel(ChatCompletionOption.Model)
-	if model == nil {
-		return nil, fmt.Errorf("unsupport model (%s)", ChatCompletionOption.Model)
-	}
-
-	var uri = "/chat/"
-	if model.Channel == "本地模型" {
-		uri = "/local_chat/"
 	}
 
 	token, err := f.getAuthToken()
@@ -38,13 +28,13 @@ func (f *FengChao) ChatCompletionStream(ctx context.Context, prompt Prompt, chat
 
 	resp, err := f.client.R().
 		SetContext(ctx).
-		SetBody(ChatCompletionOption).
+		SetBody(ChatCompletionParams).
 		SetHeaderMultiValues(map[string][]string{
 			"Content-Type":  {"application/json"},
 			"Authorization": {token},
 		}).
 		SetDoNotParseResponse(true).
-		Post(uri)
+		Post("/chat/")
 
 	if err != nil {
 		return nil, fmt.Errorf("fail to post request cause: %s", err)
@@ -64,9 +54,9 @@ func (f *FengChao) ChatCompletionStream(ctx context.Context, prompt Prompt, chat
 }
 
 // ChatCompletionStreamSimple 流式聊天
-func (f *FengChao) ChatCompletionStreamSimple(ctx context.Context, prompt Prompt, chatCompletionOption ...Option[ChatCompletion]) (<-chan *ChatCompletionResult, error) {
+func (f *FengChao) ChatCompletionStreamSimple(ctx context.Context, prompt Prompt, chatCompletionOption ...Option[ChatCompletion]) (iter.Seq[ChatCompletionResult], error) {
 	reader, err := f.ChatCompletionStream(ctx, prompt, chatCompletionOption...)
-	return reader.Stream(ctx), err
+	return reader.Stream(), err
 }
 
 // handleErrorResponse 处理错误
