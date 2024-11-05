@@ -62,6 +62,7 @@ func (f *FengChao) ChatCompletionStreamSimple(ctx context.Context, prompt Prompt
 // handleErrorResponse 处理错误
 func handleErrorResponse(resp *http.Response) error {
 	buffer := bufio.NewReader(resp.Body)
+	defer resp.Body.Close()
 	data, err := buffer.ReadString('\n')
 	if err != nil {
 		if !errors.Is(err, io.EOF) {

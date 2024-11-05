@@ -139,6 +139,7 @@ type ChatCompletionResult struct {
 	Msg     string `json:"msg"`
 	Status  int    `json:"status"`
 	History []*Message
+	Error   error
 }
 
 // ChatCompletionError 聊天错误
@@ -152,16 +153,16 @@ func (cce *ChatCompletionError) String() string {
 }
 
 // VerifyError 验证错误,实现了StreamAble
-func chatCompletionErrorHandler(ccr ChatCompletionResult) error {
+func chatCompletionErrorHandler(ccr *ChatCompletionResult) (err error) {
 	if ccr.Status != 200 {
-		return fmt.Errorf("chat completion failed: [%d]%s", ccr.Status, ccr.Msg)
+		err = fmt.Errorf("chat completion failed: [%d]%s", ccr.Status, ccr.Msg)
+		ccr.Error = err
 	}
-
 	return nil
 }
 
 func (ccr *ChatCompletionResult) HandleError() error {
-	return chatCompletionErrorHandler(*ccr)
+	return chatCompletionErrorHandler(ccr)
 }
 
 // String 获取结果的正文内容字符串

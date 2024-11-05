@@ -65,7 +65,7 @@ type JsonStreamReader[T StreamAble] struct {
 	reader *bufio.Reader  // reader 用于读取数据
 	resp   *http.Response // resp 用于关闭resp.Body
 
-	errorHandler func(T) error // 处理错误
+	errorHandler func(*T) error // 处理错误
 }
 
 // Read 读取数据直到获得一个完整的数据包, 或者遇到错误或者遇到结束事件(包括EOF), 但一般情况不会遇到EOF
@@ -139,7 +139,7 @@ func (j *JsonStreamReader[T]) Read() (*T, bool, error) {
 
 		// 处理错误
 		if catchError {
-			if err := j.errorHandler(msg); err != nil {
+			if err := j.errorHandler(&msg); err != nil {
 				return nil, isFinished, err
 			}
 			return &msg, isFinished, fmt.Errorf("unhandled error event")
@@ -160,7 +160,8 @@ func (j *JsonStreamReader[T]) Stream() iter.Seq[T] {
 				return
 			}
 			if err != nil {
-				panic(err)
+				// 放弃非逻辑错误， 逻辑错误会通过errorHandler处理
+				return
 			}
 			if !yield(*msg) {
 				return
