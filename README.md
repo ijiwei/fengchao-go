@@ -547,6 +547,9 @@ func Stream() {
 
     fmt.Println("结果如下：")
     for r := range res.Stream() {
+        if r.Error != nil {
+            fmt.Print(r.Error)
+        }
         fmt.Print((r).String())
     }
     fmt.Print("\n")

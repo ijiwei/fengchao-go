@@ -68,6 +68,13 @@ func WithPredefinedPrompts(predefinedPrompts string) Option[ChatCompletion] {
 	}
 }
 
+func WithPromptFill(variables any) Option[ChatCompletion] {
+	mapVars := variablesDecode(variables)
+	return func(option *ChatCompletion) {
+		option.PromptFill = mapVars
+	}
+}
+
 // WithSystem 设置系统消息
 func WithSystem(system string) Option[ChatCompletion] {
 	return func(option *ChatCompletion) {
@@ -84,6 +91,13 @@ func WithIsSensitive(isSensitive bool) Option[ChatCompletion] {
 
 // WithVariables 设置变量
 func WithParams(variables any) Option[ChatCompletion] {
+	mapVars := variablesDecode(variables)
+	return func(option *ChatCompletion) {
+		option.variables = mapVars
+	}
+}
+
+func variablesDecode(variables any) map[string]any {
 	t := reflect.TypeOf(variables)
 	// 先判断是否为指针类型
 	if t.Kind() == reflect.Ptr {
@@ -124,9 +138,7 @@ func WithParams(variables any) Option[ChatCompletion] {
 		}
 	}
 
-	return func(option *ChatCompletion) {
-		option.variables = mapVars
-	}
+	return mapVars
 }
 
 // WithRequestID 设置请求ID

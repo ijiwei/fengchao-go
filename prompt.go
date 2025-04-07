@@ -49,9 +49,6 @@ func (m *PromptTemplate) Render(vairables map[string]interface{}) ([]byte, error
 
 // RenderMessages 渲染消息列表
 func (m *PromptTemplate) RenderMessages(vairables map[string]interface{}) ([]*Message, error) {
-	defer func() {
-		m.Messages = nil
-	}()
 	if err := m.execute(vairables); err != nil {
 		return nil, err
 	}
@@ -64,7 +61,7 @@ func (m *PromptTemplate) execute(vairables map[string]interface{}) error {
 	if len(m.Prompts) == 0 {
 		return fmt.Errorf("prompt template is empty")
 	}
-
+	m.Messages = m.Messages[:0]
 	for _, item := range m.Prompts {
 		switch item := item.(type) {
 		case *PromptTemplate:
