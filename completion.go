@@ -38,10 +38,12 @@ type ChatCompletion struct {
 	// Mode 是否流式返回
 	Mode string `json:"mode,omitempty"`
 	// PredefinedPrompts 预定义的prompt提示工程
-	PredefinedPrompts string `json:"prompt,omitempty"`
+	PredefinedPrompts string         `json:"prompt,omitempty"`
+	// PromptFill 预定义的prompts的额外参数
+	PromptFill        map[string]any `json:"prompt_fill,omitempty"`
 
 	// Variables 变量
-	variables map[string]interface{}
+	variables map[string]any
 
 	// Stop 停用词
 	Stop []string `json:"-"`
