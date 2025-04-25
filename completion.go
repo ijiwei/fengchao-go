@@ -38,9 +38,9 @@ type ChatCompletion struct {
 	// Mode 是否流式返回
 	Mode string `json:"mode,omitempty"`
 	// PredefinedPrompts 预定义的prompt提示工程
-	PredefinedPrompts string         `json:"prompt,omitempty"`
+	PredefinedPrompts string `json:"prompt,omitempty"`
 	// PromptFill 预定义的prompts的额外参数
-	PromptFill        map[string]any `json:"prompt_fill,omitempty"`
+	PromptFill map[string]any `json:"prompt_fill,omitempty"`
 
 	// Variables 变量
 	variables map[string]any
@@ -159,6 +159,7 @@ func chatCompletionErrorHandler(ccr *ChatCompletionResult) (err error) {
 	if ccr.Status != 200 {
 		err = fmt.Errorf("chat completion failed: [%d]%s", ccr.Status, ccr.Msg)
 		ccr.Error = err
+		return err
 	}
 	return nil
 }
